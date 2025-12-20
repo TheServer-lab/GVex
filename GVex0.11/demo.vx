@@ -1,0 +1,206 @@
+// demo.vx — GVex 0.11 demo (Vexon 0.4 SAFE)
+// Requires GVex running on http://localhost:5370
+
+const API = "http://localhost:5370";
+
+fn api(path, method, body) {
+    var url = API + path;
+    var opts = {};
+    opts.method = method;
+
+    if (body != null) {
+        opts.headers = {};
+        opts.headers["Content-Type"] = "application/json";
+        opts.body = json_encode(body);
+    }
+
+    var resp = fetch(url, opts);
+    return resp.json;
+}
+
+// ---------- wrappers ----------
+
+fn create_window(title, w, h) {
+    var r = api("/create_window", "POST", {
+        title: title,
+        width: w,
+        height: h
+    });
+    return r.window_id;
+}
+
+fn set_window_title(wid, title) {
+    api("/set_window_title", "POST", {
+        window_id: wid,
+        title: title
+    });
+}
+
+fn resize_window(wid, w, h) {
+    api("/resize_window", "POST", {
+        window_id: wid,
+        width: w,
+        height: h
+    });
+}
+
+fn close_window(wid) {
+    api("/close_window", "POST", {
+        window_id: wid
+    });
+}
+
+fn create_widget(obj) {
+    var r = api("/create_widget", "POST", obj);
+    return r.widget_id;
+}
+
+fn set_widget_text(id, text) {
+    api("/set_widget_text", "POST", {
+        widget_id: id,
+        text: text
+    });
+}
+
+fn set_widget_value(id, value) {
+    api("/set_widget_value", "POST", {
+        widget_id: id,
+        value: value
+    });
+}
+
+fn get_widget_data(id) {
+    var r = api("/get_widget_data", "POST", {
+        widget_id: id
+    });
+    return r.value;
+}
+
+fn get_event() {
+    var r = fetch(API + "/get_event", { method: "GET" });
+    return r.json;
+}
+
+fn create_canvas(wid, w, h, x, y) {
+    var r = api("/create_canvas", "POST", {
+        window_id: wid,
+        width: w,
+        height: h,
+        x: x,
+        y: y
+    });
+    return r.canvas_id;
+}
+
+fn create_canvas_item(obj) {
+    var r = api("/create_canvas_item", "POST", obj);
+    return r.item_id;
+}
+
+fn move_obj(id, dx, dy, is_canvas) {
+    api("/move", "POST", {
+        id: id,
+        dx: dx,
+        dy: dy,
+        is_canvas: is_canvas
+    });
+}
+
+// ---------- demo ----------
+
+fn main() {
+    print("Starting GVex demo...");
+
+    var win = create_window("GVex 0.11 Demo", 900, 650);
+
+    var label = create_widget({
+        window_id: win,
+        type: "label",
+        text: "GVex 0.11 — Vexon 0.4 Demo",
+        x: 10, y: 10, width: 400, height: 24
+    });
+
+    var button = create_widget({
+        window_id: win,
+        type: "button",
+        text: "Click me",
+        x: 10, y: 40, width: 120, height: 30
+    });
+
+    var slider = create_widget({
+        window_id: win,
+        type: "slider",
+        min_val: 0,
+        max_val: 100,
+        x: 10, y: 80, width: 300
+    });
+
+    var progress = create_widget({
+        window_id: win,
+        type: "progressbar",
+        min_val: 0,
+        max_val: 100,
+        x: 320, y: 80, width: 300
+    });
+
+    var textarea = create_widget({
+        window_id: win,
+        type: "textarea",
+        text: "Event log:\n",
+        x: 10, y: 120, width: 610, height: 260
+    });
+
+    var canvas = create_canvas(win, 600, 200, 10, 400);
+
+    var rect = create_canvas_item({
+        canvas_id: canvas,
+        type: "rect",
+        x1: 10, y1: 10, x2: 110, y2: 60,
+        fill: "blue"
+    });
+
+    set_window_title(win, "GVex Demo — Input & Events");
+    resize_window(win, 960, 700);
+
+    // ---------- event loop ----------
+    while (true) {
+        sleep(20);
+
+        var sval = get_widget_data(slider);
+        if (sval != null) {
+            set_widget_value(progress, sval);
+        }
+
+        var ev = get_event();
+        if (ev == null) continue;
+        if (ev.type == "idle") continue;
+
+        if (ev.type == "click") {
+            set_widget_text(textarea,
+                get_widget_data(textarea) +
+                "Button clicked (id " + ev.id + ")\n"
+            );
+        }
+
+        if (ev.type == "key") {
+            if (ev.key == "Escape" && ev.state == "down") {
+                close_window(win);
+                break;
+            }
+        }
+
+        if (ev.type == "mouse") {
+            if (ev.event == "drag") {
+                move_obj(rect, ev.x / 20, ev.y / 20, true);
+            }
+        }
+
+        if (ev.type == "window_close") {
+            break;
+        }
+    }
+
+    print("Demo finished.");
+}
+
+main();
